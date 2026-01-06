@@ -102,14 +102,15 @@ if st.button("➕ Add Another Announcement"):
 
 st.divider()
 
-# ---------- SAVE BUTTON ----------
+
+
 if st.button("💾 Save on Notice Board", use_container_width=True):
 
     try:
         # ---- UPSERT DAY ----
         supabase.table("notice_board_days").upsert(
             {
-                "notice_date": notice_date.isoformat(),  # DATE-safe
+                "notice_date": notice_date.isoformat(),
                 "day_name": day_name,
                 "day_order": day_order,
                 "day_count": day_count
@@ -140,6 +141,5 @@ if st.button("💾 Save on Notice Board", use_container_width=True):
         st.success("✅ Notice Board saved successfully")
         st.session_state.announcements = [{"title": "", "message": ""}]
 
-    except APIError as e:
-        st.error("❌ Database error")
-        st.code(e.args)
+    except APIError:
+        st.error("❌ Something went wrong while saving. Please try again.")
