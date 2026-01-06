@@ -4,54 +4,47 @@ from datetime import datetime
 import pytz
 from postgrest.exceptions import APIError
 
-# ---------- PAGE CONFIG (ONLY ONCE) ----------
-st.set_page_config(page_title="Notice Board", layout="centered")
-
-# ---------- ACCESS CODE ----------
+# ------------------ ACCESS CONTROL ------------------
 if "authorized" not in st.session_state:
     st.session_state.authorized = False
 
 if not st.session_state.authorized:
-    st.subheader("🔐 Notice Board Access")
-
+    st.set_page_config(page_title="Notice Board Access", layout="centered")
     access_code = st.text_input("Access Code", type="password")
-
     if st.button("Unlock"):
         if access_code == st.secrets["notice_board"]["access_code"]:
             st.session_state.authorized = True
             st.rerun()
         else:
             st.error("❌ Invalid access code")
-
     st.stop()
 
-# ---------- SUPABASE ----------
+# ------------------ SUPABASE CLIENT ------------------
 SUPABASE_URL = st.secrets["supabase"]["url"]
 SUPABASE_KEY = st.secrets["supabase"]["key"]
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ---------- INDIAN TIME ----------
+# ------------------ TIMEZONE ------------------
 ist = pytz.timezone("Asia/Kolkata")
 now_ist = datetime.now(ist)
-
 default_date = now_ist.date()
 default_day = now_ist.strftime("%A")
 
+st.set_page_config(page_title="Notice Board", layout="centered")
 st.subheader("📌 Notice Board Entry", divider="rainbow")
+st.divider()
 
-# ---------- DATE & DAY ----------
+# ------------------ DATE & DAY ------------------
 col1, col2 = st.columns(2)
-
 with col1:
     notice_date = st.date_input("📅 Date", value=default_date)
-
 with col2:
     day_name = st.text_input("📆 Day", value=default_day)
 
-# ---------- DAY ORDER ----------
+# ------------------ DAY ORDER ------------------
 day_order = st.selectbox("🔢 Day Order", ["I", "II", "III", "IV", "V", "VI"])
 
-# ---------- LOAD PREVIOUS DAY COUNT ----------
+# ------------------ PREVIOUS DAY COUNT ------------------
 prev_count = 0
 try:
     prev_data = (
@@ -61,12 +54,10 @@ try:
         .limit(1)
         .execute()
     )
-
     if prev_data.data:
         prev_count = prev_data.data[0]["day_count"]
-
-except APIError as e:
-    st.error(f"DB error while loading previous count: {e}")
+except Exception:
+    prev_count = 0  # fail silently
 
 day_count = st.number_input(
     "📊 Day Count",
@@ -77,59 +68,47 @@ day_count = st.number_input(
 
 st.divider()
 
-# ---------- ANNOUNCEMENTS ----------
+# ------------------ ANNOUNCEMENTS ------------------
 st.subheader("📢 Announcements")
-
 if "announcements" not in st.session_state:
     st.session_state.announcements = [{"title": "", "message": ""}]
 
 for idx, ann in enumerate(st.session_state.announcements):
     with st.container(border=True):
         st.markdown(f"**Announcement {idx + 1}**")
-        ann["title"] = st.text_input(
-            "Title",
-            value=ann["title"],
-            key=f"title_{idx}"
-        )
-        ann["message"] = st.text_area(
-            "Message",
-            value=ann["message"],
-            key=f"msg_{idx}"
-        )
+        ann["title"] = st.text_input("Title", value=ann["title"], key=f"title_{idx}")
+        ann["message"] = st.text_area("Message", value=ann["message"], key=f"msg_{idx}")
 
 if st.button("➕ Add Another Announcement"):
     st.session_state.announcements.append({"title": "", "message": ""})
 
 st.divider()
 
-
-
+# ------------------ SAVE BUTTON ------------------
 if st.button("💾 Save on Notice Board", use_container_width=True):
-
     try:
-        # ---- UPSERT DAY ----
+        # --- UPSERT DAY (handle duplicates) ---
         supabase.table("notice_board_days").upsert(
             {
-                "notice_date": notice_date.isoformat(),
+                "notice_date": str(notice_date),
                 "day_name": day_name,
                 "day_order": day_order,
                 "day_count": day_count
             },
-            on_conflict="notice_date"
+            on_conflict="notice_board_days_notice_date_key"  # exact unique constraint name
         ).execute()
 
-        # ---- FETCH DAY ID ----
+        # --- FETCH DAY ID ---
         day_row = (
             supabase.table("notice_board_days")
             .select("id")
-            .eq("notice_date", notice_date.isoformat())
+            .eq("notice_date", str(notice_date))
             .single()
             .execute()
         )
-
         day_id = day_row.data["id"]
 
-        # ---- INSERT ANNOUNCEMENTS ----
+        # --- INSERT ANNOUNCEMENTS ---
         for ann in st.session_state.announcements:
             if ann["title"].strip() and ann["message"].strip():
                 supabase.table("announcements").insert({
@@ -141,5 +120,8 @@ if st.button("💾 Save on Notice Board", use_container_width=True):
         st.success("✅ Notice Board saved successfully")
         st.session_state.announcements = [{"title": "", "message": ""}]
 
-    except APIError:
-        st.error("❌ Something went wrong while saving. Please try again.")
+    except APIError as e:
+        st.error("❌ Could not save notice board. Possibly duplicate entry or network issue.")
+        # Optional: log for debugging
+        # import logging; logging.error(e)
+
