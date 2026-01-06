@@ -57,7 +57,7 @@ try:
     if prev_data.data:
         prev_count = prev_data.data[0]["day_count"]
 except Exception:
-    prev_count = 0  # fail silently
+    prev_count = 0
 
 day_count = st.number_input(
     "📊 Day Count",
@@ -84,9 +84,10 @@ if st.button("➕ Add Another Announcement"):
 
 st.divider()
 
+# ------------------ SAVE BUTTON ------------------
 if st.button("💾 Save on Notice Board", use_container_width=True):
     try:
-        # --- Check if the day already exists ---
+        # -------- Check if day exists --------
         day_row = (
             supabase.table("notice_board_days")
             .select("id")
@@ -96,7 +97,7 @@ if st.button("💾 Save on Notice Board", use_container_width=True):
         )
 
         if day_row.data:
-            # Row exists → update
+            # Exists → update
             day_id = day_row.data["id"]
             supabase.table("notice_board_days").update({
                 "day_name": day_name,
@@ -104,7 +105,7 @@ if st.button("💾 Save on Notice Board", use_container_width=True):
                 "day_count": day_count
             }).eq("id", day_id).execute()
         else:
-            # Row does not exist → insert
+            # Does not exist → insert
             insert_res = supabase.table("notice_board_days").insert({
                 "notice_date": str(notice_date),
                 "day_name": day_name,
@@ -113,7 +114,7 @@ if st.button("💾 Save on Notice Board", use_container_width=True):
             }).execute()
             day_id = insert_res.data[0]["id"]
 
-        # --- Insert announcements ---
+        # -------- Insert announcements --------
         for ann in st.session_state.announcements:
             if ann["title"].strip() and ann["message"].strip():
                 supabase.table("announcements").insert({
@@ -126,5 +127,4 @@ if st.button("💾 Save on Notice Board", use_container_width=True):
         st.session_state.announcements = [{"title": "", "message": ""}]
 
     except APIError as e:
-        st.error("❌ Could not save notice board. Possibly duplicate entry or network issue.")
-
+        st.error("❌ Could not save notice board. Duplicate date or network issue.")
