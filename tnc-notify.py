@@ -2,13 +2,17 @@ import streamlit as st
 from supabase import create_client
 from datetime import datetime
 import pytz
+from postgrest.exceptions import APIError
+
+# ---------- PAGE CONFIG (ONLY ONCE) ----------
+st.set_page_config(page_title="Notice Board", layout="centered")
 
 # ---------- ACCESS CODE ----------
 if "authorized" not in st.session_state:
     st.session_state.authorized = False
 
 if not st.session_state.authorized:
-    st.set_page_config(page_title="Notice Board Access", layout="centered")
+    st.subheader("🔐 Notice Board Access")
 
     access_code = st.text_input("Access Code", type="password")
 
@@ -20,7 +24,6 @@ if not st.session_state.authorized:
             st.error("❌ Invalid access code")
 
     st.stop()
-
 
 # ---------- SUPABASE ----------
 SUPABASE_URL = st.secrets["supabase"]["url"]
@@ -34,10 +37,7 @@ now_ist = datetime.now(ist)
 default_date = now_ist.date()
 default_day = now_ist.strftime("%A")
 
-st.set_page_config(page_title="Notice Board", layout="centered")
-
 st.subheader("📌 Notice Board Entry", divider="rainbow")
-st.divider()
 
 # ---------- DATE & DAY ----------
 col1, col2 = st.columns(2)
@@ -53,16 +53,20 @@ day_order = st.selectbox("🔢 Day Order", ["I", "II", "III", "IV", "V", "VI"])
 
 # ---------- LOAD PREVIOUS DAY COUNT ----------
 prev_count = 0
-prev_data = (
-    supabase.table("notice_board_days")
-    .select("day_count")
-    .order("notice_date", desc=True)
-    .limit(1)
-    .execute()
-)
+try:
+    prev_data = (
+        supabase.table("notice_board_days")
+        .select("day_count")
+        .order("notice_date", desc=True)
+        .limit(1)
+        .execute()
+    )
 
-if prev_data.data:
-    prev_count = prev_data.data[0]["day_count"]
+    if prev_data.data:
+        prev_count = prev_data.data[0]["day_count"]
+
+except APIError as e:
+    st.error(f"DB error while loading previous count: {e}")
 
 day_count = st.number_input(
     "📊 Day Count",
@@ -101,36 +105,41 @@ st.divider()
 # ---------- SAVE BUTTON ----------
 if st.button("💾 Save on Notice Board", use_container_width=True):
 
-    # ---- UPSERT DAY (one per date) ----
-    supabase.table("notice_board_days").upsert(
-        {
-            "notice_date": str(notice_date),
-            "day_name": day_name,
-            "day_order": day_order,
-            "day_count": day_count
-        },
-        on_conflict="notice_date"
-    ).execute()
+    try:
+        # ---- UPSERT DAY ----
+        supabase.table("notice_board_days").upsert(
+            {
+                "notice_date": notice_date.isoformat(),  # DATE-safe
+                "day_name": day_name,
+                "day_order": day_order,
+                "day_count": day_count
+            },
+            on_conflict="notice_date"
+        ).execute()
 
-    # ---- FETCH DAY ID ----
-    day_row = (
-        supabase.table("notice_board_days")
-        .select("id")
-        .eq("notice_date", str(notice_date))
-        .single()
-        .execute()
-    )
+        # ---- FETCH DAY ID ----
+        day_row = (
+            supabase.table("notice_board_days")
+            .select("id")
+            .eq("notice_date", notice_date.isoformat())
+            .single()
+            .execute()
+        )
 
-    day_id = day_row.data["id"]
+        day_id = day_row.data["id"]
 
-    # ---- INSERT ANNOUNCEMENTS (many per date) ----
-    for ann in st.session_state.announcements:
-        if ann["title"].strip() and ann["message"].strip():
-            supabase.table("announcements").insert({
-                "day_id": day_id,
-                "title": ann["title"],
-                "message": ann["message"]
-            }).execute()
+        # ---- INSERT ANNOUNCEMENTS ----
+        for ann in st.session_state.announcements:
+            if ann["title"].strip() and ann["message"].strip():
+                supabase.table("announcements").insert({
+                    "day_id": day_id,
+                    "title": ann["title"],
+                    "message": ann["message"]
+                }).execute()
 
-    st.success("✅ Notice Board saved successfully")
-    st.session_state.announcements = [{"title": "", "message": ""}]
+        st.success("✅ Notice Board saved successfully")
+        st.session_state.announcements = [{"title": "", "message": ""}]
+
+    except APIError as e:
+        st.error("❌ Database error")
+        st.code(e.args)
