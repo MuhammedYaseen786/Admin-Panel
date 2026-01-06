@@ -3,6 +3,28 @@ from supabase import create_client
 from datetime import datetime
 import pytz
 
+# ---------- ACCESS CODE ----------
+if "authorized" not in st.session_state:
+    st.session_state.authorized = False
+
+if not st.session_state.authorized:
+    st.set_page_config(page_title="Notice Board Access", layout="centered")
+
+    access_code = st.text_input(
+        "Access Code",
+        type="password"
+    )
+
+    if st.button("Unlock"):
+        if access_code == st.secrets["notice_board"]["access_code"]:
+            st.session_state.authorized = True
+            st.rerun()
+        else:
+            st.error("❌ Invalid access code")
+
+    st.stop()   # ⛔ STOP HERE — form will NOT load
+
+
 # ---------- SUPABASE ----------
 SUPABASE_URL = st.secrets["supabase"]["url"]
 SUPABASE_KEY = st.secrets["supabase"]["key"]
