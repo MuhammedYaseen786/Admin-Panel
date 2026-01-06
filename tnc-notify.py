@@ -84,21 +84,9 @@ if st.button("➕ Add Another Announcement"):
 
 st.divider()
 
-# ------------------ SAVE BUTTON ------------------
 if st.button("💾 Save on Notice Board", use_container_width=True):
     try:
-        # --- UPSERT DAY (handle duplicates) ---
-        supabase.table("notice_board_days").upsert(
-            {
-                "notice_date": str(notice_date),
-                "day_name": day_name,
-                "day_order": day_order,
-                "day_count": day_count
-            },
-            on_conflict="notice_board_days_notice_date_key"  # exact unique constraint name
-        ).execute()
-
-        # --- FETCH DAY ID ---
+        # --- Check if the day already exists ---
         day_row = (
             supabase.table("notice_board_days")
             .select("id")
@@ -106,9 +94,26 @@ if st.button("💾 Save on Notice Board", use_container_width=True):
             .single()
             .execute()
         )
-        day_id = day_row.data["id"]
 
-        # --- INSERT ANNOUNCEMENTS ---
+        if day_row.data:
+            # Row exists → update
+            day_id = day_row.data["id"]
+            supabase.table("notice_board_days").update({
+                "day_name": day_name,
+                "day_order": day_order,
+                "day_count": day_count
+            }).eq("id", day_id).execute()
+        else:
+            # Row does not exist → insert
+            insert_res = supabase.table("notice_board_days").insert({
+                "notice_date": str(notice_date),
+                "day_name": day_name,
+                "day_order": day_order,
+                "day_count": day_count
+            }).execute()
+            day_id = insert_res.data[0]["id"]
+
+        # --- Insert announcements ---
         for ann in st.session_state.announcements:
             if ann["title"].strip() and ann["message"].strip():
                 supabase.table("announcements").insert({
@@ -122,6 +127,4 @@ if st.button("💾 Save on Notice Board", use_container_width=True):
 
     except APIError as e:
         st.error("❌ Could not save notice board. Possibly duplicate entry or network issue.")
-        # Optional: log for debugging
-        # import logging; logging.error(e)
 
