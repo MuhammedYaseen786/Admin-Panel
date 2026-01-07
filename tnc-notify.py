@@ -9,7 +9,7 @@ if "authorized" not in st.session_state:
     st.session_state.authorized = False
 
 if not st.session_state.authorized:
-    st.set_page_config(page_title="Notice Board Access", layout="centered")
+    st.set_page_config(page_title="Notice Board Access", layout="wide")
     access_code = st.text_input("Access Code", type="password")
     if st.button("Unlock"):
         if access_code == st.secrets["notice_board"]["access_code"]:
@@ -30,7 +30,7 @@ now_ist = datetime.now(ist)
 default_date = now_ist.date()
 default_day = now_ist.strftime("%A")
 
-st.set_page_config(page_title="Notice Board", layout="centered")
+st.set_page_config(page_title="Notice Board", layout="wide")
 st.subheader("📌 Notice Board Entry", divider="rainbow")
 st.divider()
 
@@ -92,7 +92,6 @@ if st.button("💾 Save on Notice Board", use_container_width=True):
             supabase.table("notice_board_days")
             .select("id")
             .eq("notice_date", str(notice_date))
-            .single()
             .execute()
         )
 
