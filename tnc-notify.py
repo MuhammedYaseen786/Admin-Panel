@@ -42,7 +42,7 @@ with col2:
     day_name = st.text_input("📆 Day", value=default_day)
 
 # ------------------ DAY ORDER ------------------
-day_order = st.selectbox("🔢 Day Order", ["I", "II", "III", "IV", "V", "VI"])
+day_order = st.selectbox("🔢 Day Order", ["I", "II", "III", "IV", "V", "VI", "--"])
 
 # ------------------ PREVIOUS DAY COUNT ------------------
 prev_count = 0
