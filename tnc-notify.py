@@ -95,9 +95,9 @@ if st.button("💾 Save on Notice Board", use_container_width=True):
             .execute()
         )
 
-        if day_row.data:
+        if day_row.data and len(day_row.data) > 0:
             # Exists → update
-            day_id = day_row.data["id"]
+            day_id = day_row.data[0]["id"]
             supabase.table("notice_board_days").update({
                 "day_name": day_name,
                 "day_order": day_order,
@@ -112,6 +112,7 @@ if st.button("💾 Save on Notice Board", use_container_width=True):
                 "day_count": day_count
             }).execute()
             day_id = insert_res.data[0]["id"]
+
 
         # -------- Insert announcements --------
         for ann in st.session_state.announcements:
