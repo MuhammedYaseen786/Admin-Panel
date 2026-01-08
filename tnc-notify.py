@@ -4,12 +4,17 @@ from datetime import datetime
 import pytz
 from postgrest.exceptions import APIError
 
+st.set_page_config(
+    page_title="Notice Board Admin",
+    page_icon="tnc-logo-1.png",
+    layout="wide"
+)
+
 # ------------------ ACCESS CONTROL ------------------
 if "authorized" not in st.session_state:
     st.session_state.authorized = False
 
 if not st.session_state.authorized:
-    st.set_page_config(page_title="Notice Board Access", layout="wide")
     access_code = st.text_input("Access Code", type="password")
     if st.button("Unlock"):
         if access_code == st.secrets["notice_board"]["access_code"]:
@@ -30,7 +35,6 @@ now_ist = datetime.now(ist)
 default_date = now_ist.date()
 default_day = now_ist.strftime("%A")
 
-st.set_page_config(page_title="Notice Board Admin", layout="wide")
 st.title("📌 Notice Board Admin Panel")
 
 # ------------------ TABS ------------------
@@ -49,8 +53,13 @@ with tab1:
     col1, col2 = st.columns(2)
     with col1:
         notice_date = st.date_input("📅 Date", value=default_date)
+
+    # derive day dynamically from selected date
+    dynamic_day = notice_date.strftime("%A")
+
     with col2:
-        day_name = st.text_input("📆 Day", value=default_day)
+        day_name = st.text_input("📆 Day", value=dynamic_day)
+
 
     day_order = st.selectbox("🔢 Day Order", ["I", "II", "III", "IV", "V", "VI", "--"])
 
