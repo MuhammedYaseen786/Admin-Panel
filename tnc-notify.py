@@ -38,10 +38,11 @@ default_day = now_ist.strftime("%A")
 st.title("📌 Notice Board Admin Panel")
 
 # ------------------ TABS ------------------
-tab1, tab2, tab3 = st.tabs([
+tab1, tab2, tab3, tab4 = st.tabs([
     "📝 Add / Update Notice",
     "🗑️ Manage Days",
-    "📢 Manage Announcements"
+    "📢 Manage Announcements",
+    "✏️ Edit Notice Board"
 ])
 
 # ====================================================
@@ -246,4 +247,141 @@ with tab3:
             del st.session_state.confirm_ann
             st.info("Deletion cancelled")
             st.rerun()
+
+# ====================================================
+# TAB 4 — EDIT NOTICE BOARD (DAY + ANNOUNCEMENTS)
+# ====================================================
+with tab4:
+    st.subheader("✏️ Edit Notice Board")
+
+    edit_date = st.date_input(
+        "📅 Select Date to Edit",
+        key="edit_notice_date",
+        value=None
+    )
+
+    if not edit_date:
+        st.info("Select a date to edit.")
+        st.stop()
+
+    # ------------------ FETCH DAY ------------------
+    day_res = (
+        supabase.table("notice_board_days")
+        .select("*")
+        .eq("notice_date", str(edit_date))
+        .execute()
+    )
+
+    if not day_res.data:
+        st.warning("No notice found for this date.")
+        st.stop()
+
+    day = day_res.data[0]
+
+    # ------------------ EDIT DAY DETAILS ------------------
+    st.subheader("📅 Day Details")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        edit_day_name = st.text_input(
+            "Day Name",
+            value=day["day_name"]
+        )
+
+    with col2:
+        edit_day_order = st.selectbox(
+            "Day Order",
+            ["I", "II", "III", "IV", "V", "VI", "--"],
+            index=["I", "II", "III", "IV", "V", "VI", "--"].index(day["day_order"])
+        )
+
+    with col3:
+        edit_day_count = st.number_input(
+            "Day Count",
+            min_value=1,
+            value=day["day_count"],
+            step=1
+        )
+
+    st.divider()
+
+    # ------------------ FETCH ANNOUNCEMENTS ------------------
+    anns = (
+        supabase.table("announcements")
+        .select("*")
+        .eq("day_id", day["id"])
+        .execute()
+        .data
+    )
+
+    st.subheader("📢 Announcements")
+
+    if not anns:
+        st.info("No announcements for this day.")
+
+    if "edit_announcements" not in st.session_state:
+        st.session_state.edit_announcements = anns.copy()
+
+    for i, ann in enumerate(st.session_state.edit_announcements):
+        with st.container(border=True):
+            st.markdown(f"**Announcement {i + 1}**")
+
+            ann["title"] = st.text_input(
+                "Title",
+                ann["title"],
+                key=f"edit_title_{i}"
+            )
+
+            ann["message"] = st.text_area(
+                "Message",
+                ann["message"],
+                key=f"edit_msg_{i}"
+            )
+
+    col1, col2 = st.columns(2)
+
+    if col1.button("➕ Add New Announcement"):
+        st.session_state.edit_announcements.append({
+            "id": None,
+            "day_id": day["id"],
+            "title": "",
+            "message": ""
+        })
+
+    st.divider()
+
+    # ------------------ SAVE ALL ------------------
+    if st.button("💾 Save All Changes", use_container_width=True):
+        try:
+            # Update day
+            supabase.table("notice_board_days").update({
+                "day_name": edit_day_name,
+                "day_order": edit_day_order,
+                "day_count": edit_day_count
+            }).eq("id", day["id"]).execute()
+
+            # Update / Insert announcements
+            for ann in st.session_state.edit_announcements:
+                if not ann["title"].strip() or not ann["message"].strip():
+                    continue
+
+                if ann.get("id"):
+                    supabase.table("announcements").update({
+                        "title": ann["title"],
+                        "message": ann["message"]
+                    }).eq("id", ann["id"]).execute()
+                else:
+                    supabase.table("announcements").insert({
+                        "day_id": day["id"],
+                        "title": ann["title"],
+                        "message": ann["message"]
+                    }).execute()
+
+            del st.session_state.edit_announcements
+            st.success("✅ Notice board updated successfully")
+            st.rerun()
+
+        except APIError:
+            st.error("❌ Failed to update notice board")
 
