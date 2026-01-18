@@ -128,11 +128,11 @@ with tab1:
                 day_id = res.data[0]["id"]
 
             for ann in st.session_state.announcements:
-                if ann["title"].strip() and ann["message"].strip():
+                if ann["title"].strip() or ann["message"].strip():
                     supabase.table("announcements").insert({
                         "day_id": day_id,
-                        "title": ann["title"],
-                        "message": ann["message"]
+                        "title": ann["title"].strip(),
+                        "message": ann["message"].strip()
                     }).execute()
 
             st.success("✅ Saved successfully")
@@ -363,20 +363,22 @@ with tab4:
 
             # Update / Insert announcements
             for ann in st.session_state.edit_announcements:
-                if not ann["title"].strip() or not ann["message"].strip():
+                # Skip ONLY if both are empty
+                if not ann["title"].strip() and not ann["message"].strip():
                     continue
 
                 if ann.get("id"):
                     supabase.table("announcements").update({
-                        "title": ann["title"],
-                        "message": ann["message"]
+                        "title": ann["title"].strip(),
+                        "message": ann["message"].strip()
                     }).eq("id", ann["id"]).execute()
                 else:
                     supabase.table("announcements").insert({
                         "day_id": day["id"],
-                        "title": ann["title"],
-                        "message": ann["message"]
+                        "title": ann["title"].strip(),
+                        "message": ann["message"].strip()
                     }).execute()
+
 
             del st.session_state.edit_announcements
             st.success("✅ Notice board updated successfully")
