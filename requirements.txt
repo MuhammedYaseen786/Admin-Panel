@@ -1,4 +1,6 @@
 streamlit
-supabase
 pytz
+supabase
+postgrest
+reportlab
 python-dateutil
